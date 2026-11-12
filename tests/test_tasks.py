@@ -49,11 +49,13 @@ def test_health_and_task_only_idempotent_migrations(client):
     assert "llm_calls" not in tables
 
 
-def test_migration_preserves_legacy_document_data(tmp_path, monkeypatch):
+def test_migration_removes_non_task_tables(tmp_path, monkeypatch):
     database = tmp_path / "legacy.sqlite"
     connection = sqlite3.connect(database)
+    connection.execute("create table schema_migrations(version integer primary key)")
+    connection.execute("insert into schema_migrations(version) values (1), (2)")
     connection.execute("create table documents(id integer primary key, body text)")
-    connection.execute("insert into documents(body) values ('legacy')")
+    connection.execute("create table llm_calls(id integer primary key)")
     connection.commit()
     connection.close()
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{database}")
@@ -61,7 +63,14 @@ def test_migration_preserves_legacy_document_data(tmp_path, monkeypatch):
     hub.apply_migrations()
 
     connection = sqlite3.connect(database)
-    assert connection.execute("select body from documents").fetchone() == ("legacy",)
+    remaining = {
+        row[0]
+        for row in connection.execute(
+            "select name from sqlite_master where type = 'table'"
+        )
+    }
+    assert "documents" not in remaining
+    assert "llm_calls" not in remaining
     connection.close()
 
 

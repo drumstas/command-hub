@@ -56,7 +56,7 @@ Discord šiuo metu palaiko `/link`, `/tasks` ir `/done`. Užduočių kūrimas su
 administratoriaus patvirtinimu, balso žinutės ir klausimai natūralia kalba
 prieinami tik per Telegram.
 
-## Svarbu
+## Telegram pranešimai
 
-Botas nekuria dokumentų ir nesiunčia pranešimų klientams. Kad Telegram botas
-galėtų parašyti nariui, narys turi būti pradėjęs asmeninį pokalbį su botu.
+Kad Telegram botas galėtų parašyti nariui apie jam priskirtą užduotį, narys
+turi būti pradėjęs asmeninį pokalbį su botu.

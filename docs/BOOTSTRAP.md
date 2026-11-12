@@ -1,7 +1,6 @@
 # Deployment setup
 
-The application currently handles tasks only. There are no document or draft
-commands.
+The application handles task management only.
 
 ## Required configuration
 
@@ -64,9 +63,9 @@ for those workflows.
 ## Database and reminders
 
 The app applies idempotent migrations on startup. Migration `0002` creates
-task-approval storage. Any legacy documents table in an existing database is
-left untouched to preserve its data, but the application no longer reads or
-writes that table.
+task-approval storage. Migration `0003` removes old document and LLM-usage
+tables; their data is intentionally discarded because those features are out
+of scope.
 
 Configure a scheduler to call `POST /internal/tick` with the
 `X-Internal-Secret` header set to `INTERNAL_SECRET` every 15 minutes. This

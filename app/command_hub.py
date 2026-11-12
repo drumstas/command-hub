@@ -119,33 +119,28 @@ def apply_migrations() -> None:
             connection.execute(
                 "insert or ignore into schema_migrations(version) values (1)"
             )
-            migration = connection.execute(
-                "select 1 from schema_migrations where version = 2"
-            ).fetchone()
-            if migration is None:
-                connection.execute(
-                    """create table if not exists pending_tasks(
-                         token text primary key,
-                         source_event_id text not null unique,
-                         requester_id integer not null references members(id),
-                         assignee_id integer not null references members(id),
-                         title text not null,
-                         details text,
-                         due_at text,
-                         created_at text not null
-                           default (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-                       )"""
+            for version in (2, 3):
+                migration = connection.execute(
+                    "select 1 from schema_migrations where version = ?", (version,)
+                ).fetchone()
+                if migration is not None:
+                    continue
+                migration_name = (
+                    "0002_task_approval.sql"
+                    if version == 2
+                    else "0003_remove_non_task_tables.sql"
                 )
-                connection.execute(
-                    """create table if not exists used_link_codes(
-                         code text primary key,
-                         member_key text not null,
-                         platform text not null check (platform in ('telegram','discord')),
-                         used_at text not null
-                           default (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
-                       )"""
+                migration_sql = (MIGRATIONS_DIR / migration_name).read_text()
+                migration_sql = migration_sql.replace(
+                    "default now()",
+                    "default (strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
                 )
-                connection.execute("insert into schema_migrations(version) values (2)")
+                for statement in migration_sql.split(";"):
+                    if statement.strip():
+                        connection.execute(statement)
+                connection.execute(
+                    "insert into schema_migrations(version) values (?)", (version,)
+                )
             connection.commit()
             return
 
@@ -153,7 +148,7 @@ def apply_migrations() -> None:
         connection.execute(
             "create table if not exists schema_migrations(version integer primary key)"
         )
-        for version in (1, 2):
+        for version in (1, 2, 3):
             exists = connection.execute(
                 "select 1 from schema_migrations where version = %s", (version,)
             ).fetchone()
@@ -162,6 +157,8 @@ def apply_migrations() -> None:
             migration_path = MIGRATIONS_DIR / f"{version:04d}_init.sql"
             if version == 2:
                 migration_path = MIGRATIONS_DIR / "0002_task_approval.sql"
+            elif version == 3:
+                migration_path = MIGRATIONS_DIR / "0003_remove_non_task_tables.sql"
             for statement in migration_path.read_text().split(";"):
                 if statement.strip():
                     connection.execute(statement)

@@ -35,6 +35,5 @@ link codes before using the bot. See [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md).
 
 - Tasks are not created until an administrator presses **Patvirtinti**.
 - Telegram query access is available only to linked members.
-- Documents, drafts, and customer messaging are not part of this version.
 - Production uses Postgres; local tests use SQLite.
 - Do not commit `.env` or any real credentials.
