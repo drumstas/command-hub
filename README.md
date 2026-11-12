@@ -36,6 +36,8 @@ Configure the Gemini model, Telegram bot, administrator, and roster before
 using the bot. The administrator gathers teammate account IDs and assigns them
 through Telegram `/link`; members cannot link themselves. See
 [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md).
+For end-to-end manual checks, see
+[docs/ACCEPTANCE_TESTING.md](docs/ACCEPTANCE_TESTING.md).
 
 ## Important
 

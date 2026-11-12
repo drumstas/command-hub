@@ -92,6 +92,9 @@ the app, add the repository secret `HEALTHCHECK_URL` with the deployed
 `https://YOUR-SERVICE/healthz` URL, then restore the `schedule` trigger in
 `.github/workflows/keepalive.yml` to enable periodic pings.
 
+For end-to-end checks after setup, follow
+[the manual acceptance scenarios](./ACCEPTANCE_TESTING.md).
+
 ## Local checks
 
 ```bash
