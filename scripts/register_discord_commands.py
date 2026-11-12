@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import os
-from urllib import request, error
+from urllib import error, request
 
 APP_ID = os.getenv("DISCORD_APPLICATION_ID", "")
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
@@ -19,9 +19,8 @@ COMMANDS = [
         "description": "List tasks.",
         "options": [{"name": "scope", "description": "Task scope", "type": 3, "choices": [{"name": "mine", "value": "mine"}, {"name": "all", "value": "all"}]}],
     },
-    {"name": "done", "description": "Mark a task as done.", "options": [{"name": "task_id", "description": "Task id", "type": 4}]},
-    {"name": "link", "description": "Link your chat to your roster handle.", "options": [{"name": "code", "description": "Your shared code", "type": 3}]},
-    {"name": "draft", "description": "Save a draft document.", "options": [{"name": "kind", "description": "Draft type", "type": 3, "choices": [{"name": "message", "value": "message"}, {"name": "quote", "value": "quote"}, {"name": "proforma", "value": "proforma"}]}, {"name": "text", "description": "Text to draft", "type": 3}]},
+    {"name": "done", "description": "Mark a task as done.", "options": [{"name": "task_id", "description": "Task id", "type": 4, "required": True}]},
+    {"name": "link", "description": "Link your chat to your roster handle.", "options": [{"name": "code", "description": "Your shared code", "type": 3, "required": True}]},
 ]
 
 if not APP_ID or not BOT_TOKEN:

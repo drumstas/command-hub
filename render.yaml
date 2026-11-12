@@ -13,6 +13,18 @@ services:
         sync: false
       - key: TELEGRAM_SECRET
         sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: OWNER_TELEGRAM_CHAT_ID
+        sync: false
+      - key: OWNER_TELEGRAM_USER_ID
+        sync: false
+      - key: OWNER_DISPLAY_NAME
+        value: Administrator
+      - key: TEAM_ROSTER
+        sync: false
+      - key: LINK_CODES
+        sync: false
       - key: DISCORD_PUBLIC_KEY
         sync: false
       - key: INTERNAL_SECRET
@@ -20,6 +32,4 @@ services:
       - key: GEMINI_API_KEY
         sync: false
       - key: GEMINI_MODEL
-        sync: false
-      - key: OWNER_CODE
         sync: false
