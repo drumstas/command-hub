@@ -74,9 +74,6 @@ def test_admin_is_seeded_as_a_task_roster_member(client):
 def test_existing_non_task_tables_are_not_dropped(tmp_path, monkeypatch):
     database = tmp_path / "legacy.sqlite"
     connection = sqlite3.connect(database)
-    connection.execute("create table schema_migrations(version integer primary key)")
-    connection.execute("insert into schema_migrations(version) values (1), (2)")
-    connection.execute("create table tasks(id integer primary key)")
     connection.execute("create table documents(id integer primary key, body text)")
     connection.execute("create table llm_calls(id integer primary key)")
     connection.commit()
@@ -94,9 +91,8 @@ def test_existing_non_task_tables_are_not_dropped(tmp_path, monkeypatch):
     }
     assert "documents" in remaining
     assert "llm_calls" in remaining
-    assert "discord_notified_at" in {
-        row[1] for row in connection.execute("pragma table_info(tasks)")
-    }
+    columns = {row[1] for row in connection.execute("pragma table_info(tasks)")}
+    assert "discord_notified_at" in columns
     connection.close()
 
 

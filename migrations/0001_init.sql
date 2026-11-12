@@ -20,6 +20,7 @@ create table if not exists tasks(
   done_at timestamptz,
   reminded_at timestamptz,
   overdue_notified_on date,
+  discord_notified_at timestamptz,
   created_at timestamptz not null default now()
 );
 

@@ -35,6 +35,7 @@ create table if not exists tasks(
   done_at text,
   reminded_at text,
   overdue_notified_on text,
+  discord_notified_at text,
   created_at text not null default (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
 create table if not exists processed_events(
@@ -84,10 +85,7 @@ def apply_migrations() -> None:
             connection.execute(
                 "insert or ignore into schema_migrations(version) values (1)"
             )
-            for version, migration_name in (
-                (2, "0002_task_approval.sql"),
-                (3, "0003_discord_task_notifications.sql"),
-            ):
+            for version, migration_name in ((2, "0002_task_approval.sql"),):
                 migration = connection.execute(
                     "select 1 from schema_migrations where version = ?", (version,)
                 ).fetchone()
@@ -111,7 +109,7 @@ def apply_migrations() -> None:
         connection.execute(
             "create table if not exists schema_migrations(version integer primary key)"
         )
-        for version in (1, 2, 3):
+        for version in (1, 2):
             exists = connection.execute(
                 "select 1 from schema_migrations where version = %s", (version,)
             ).fetchone()
@@ -120,8 +118,6 @@ def apply_migrations() -> None:
             migration_path = MIGRATIONS_DIR / f"{version:04d}_init.sql"
             if version == 2:
                 migration_path = MIGRATIONS_DIR / "0002_task_approval.sql"
-            elif version == 3:
-                migration_path = MIGRATIONS_DIR / "0003_discord_task_notifications.sql"
             for statement in migration_path.read_text().split(";"):
                 if statement.strip():
                     connection.execute(statement)
