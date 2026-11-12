@@ -12,16 +12,22 @@ Render's environment settings:
 - `TELEGRAM_SECRET`: Telegram webhook secret token; use a random value allowed
   by Telegram's secret-token format.
 - `OWNER_TELEGRAM_CHAT_ID`: administrator's private Telegram chat ID, used for
-  approval prompts and task administration.
+  approval prompts and linked to the built-in `owner` member.
 - `OWNER_TELEGRAM_USER_ID`: administrator's Telegram user ID, checked when
-  approving/rejecting tasks.
-- `TEAM_ROSTER`: JSON array of task members. Example:
-  `[{"key":"alex","display_name":"Alex","discord_user_id":"123456789012345678"}]`.
+  approving/rejecting tasks. Set both Telegram IDs; in a private chat they
+  usually have the same value.
+- `TEAM_ROSTER`: JSON array of task members, including the administrator under
+  the reserved key `owner`. For example:
+  `[{"key":"owner","display_name":"Administrator"},{"key":"alex","display_name":"Alex"}]`.
+  This updates the built-in owner member rather than creating a second admin.
 - `LINK_CODES`: JSON object mapping one-time codes to members, e.g.
-  `{"random-one-time-code":{"key":"alex","display_name":"Alex"}}`.
+  `{"admin-discord-code":{"key":"owner","display_name":"Administrator"},"alex-discord-code":{"key":"alex","display_name":"Alex"}}`.
   Share each code privately with its intended member. A code is consumed on
   first successful linking and cannot be used to bind a different account. Use
-  separate codes if the same member will link both Telegram and Discord.
+  separate codes if a member needs to link both Telegram and Discord. The
+  administrator's Telegram account is linked by `OWNER_TELEGRAM_CHAT_ID`;
+  use the `owner` Discord link code to connect their Discord account, or put
+  their Discord user ID in the `owner` roster entry instead.
 - `GEMINI_API_KEY` and `GEMINI_MODEL`: API key and model name verified against
   the current Google AI documentation. There is deliberately no hardcoded
   fallback model.
@@ -33,8 +39,10 @@ real Telegram IDs in this repository.
 ## Telegram bot and webhook
 
 1. Create a bot with BotFather and set `TELEGRAM_BOT_TOKEN`.
-2. Set the administrator chat and user IDs.
-3. Configure the roster and unique link codes.
+2. Set the administrator chat and user IDs. Include the administrator in
+   `TEAM_ROSTER` with `key: "owner"` so Gemini can assign tasks to them too.
+3. Configure unique link codes. The administrator should send `/link ADMIN_CODE`
+   in Discord if their Discord ID is not already set in the roster.
 4. Deploy the service and set `APP_PUBLIC_URL` to its HTTPS URL.
 5. Run `python3 scripts/set_telegram_webhook.py`. It registers
    `/telegram/webhook`, the configured secret token, and the message/callback

@@ -26,6 +26,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("DISCORD_BOT_TOKEN", "discord-bot-token")
     monkeypatch.setenv("DISCORD_TASK_CHANNEL_ID", "700")
     monkeypatch.setenv("TEAM_ROSTER", json.dumps([
+        {"key": "owner", "display_name": "Administrator"},
         {
             "key": "alex",
             "display_name": "Alex",
@@ -36,6 +37,7 @@ def client(tmp_path, monkeypatch):
         {"key": "marta", "display_name": "Marta"},
     ]))
     monkeypatch.setenv("LINK_CODES", json.dumps({
+        "owner-discord-code": {"key": "owner", "display_name": "Administrator"},
         "alex-code": {"key": "alex", "display_name": "Alex"},
         "jonas-code": {"key": "jonas", "display_name": "Jonas"},
         "marta-code": {"key": "marta", "display_name": "Marta"},
@@ -62,6 +64,20 @@ def test_health_and_task_only_idempotent_migrations(client):
     assert "discord_notified_at" in columns
     assert "documents" not in tables
     assert "llm_calls" not in tables
+
+
+def test_admin_is_seeded_as_a_task_roster_member(client):
+    owner = database.get_member_by_key("owner")
+
+    assert owner["display_name"] == "Administrator"
+    assert owner["role"] == "owner"
+    assert owner["telegram_chat_id"] == 900
+    assert owner["key"] in database.roster()
+    linked_owner = hub.link_member(
+        "discord", "owner-discord", "owner-discord-code", "Administrator"
+    )
+    assert linked_owner["role"] == "owner"
+    assert linked_owner["discord_user_id"] == "owner-discord"
 
 
 def test_existing_non_task_tables_are_not_dropped(tmp_path, monkeypatch):
