@@ -7,6 +7,10 @@ fixed, parameterized application queries. Gemini cannot access or write to the
 database. Proposed tasks are persisted only after an administrator approves
 them in Telegram.
 
+On approval, the task is also posted to the configured Discord task channel,
+where the assigned teammate is mentioned. See
+[docs/BOOTSTRAP.md](docs/BOOTSTRAP.md) for Discord channel setup.
+
 ## Telegram features
 
 - Submit a task as freeform text or a voice message.

@@ -9,12 +9,14 @@ This application manages team tasks only.
   details, and deadline.
 - Send each proposal to the Telegram administrator for approval or rejection.
 - Insert an approved task into the database only after administrator approval.
+- On approval, post the task title, details, deadline, and requester to a
+  configured Discord channel and mention the assignee.
 - Accept natural-language questions about tasks in Telegram; use Gemini to
   produce validated filters, query the database in application code, and
   summarize only the matching results.
 - List tasks, mark tasks done, and send due-soon and overdue reminders.
-- Support Telegram as the full interface and Discord for account linking,
-  listing tasks, and marking tasks done.
+- Support Telegram for task creation/approval and Discord for task
+  notifications, account linking, listing tasks, and marking tasks done.
 
 ## Safety and authorization
 
@@ -51,8 +53,9 @@ Migrations apply idempotently at startup.
 2. A member submits a task in Telegram using text or voice.
 3. Gemini proposes task fields; the administrator reviews and approves or
    rejects the proposal.
-4. On approval, application code inserts the task and notifies the requester
-   and assignee where possible.
+4. On approval, application code inserts the task, confirms it in Telegram,
+   and posts its details in Discord while mentioning the assignee. Failed
+   Discord deliveries are retried by `/internal/tick`.
 5. Members ask task questions in natural language; Gemini selects validated
    filters, application code retrieves matching task rows, and Gemini
    summarizes those rows.

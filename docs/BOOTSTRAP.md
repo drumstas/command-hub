@@ -16,7 +16,7 @@ Render's environment settings:
 - `OWNER_TELEGRAM_USER_ID`: administrator's Telegram user ID, checked when
   approving/rejecting tasks.
 - `TEAM_ROSTER`: JSON array of task members. Example:
-  `[{"key":"alex","display_name":"Alex"}]`.
+  `[{"key":"alex","display_name":"Alex","discord_user_id":"123456789012345678"}]`.
 - `LINK_CODES`: JSON object mapping one-time codes to members, e.g.
   `{"random-one-time-code":{"key":"alex","display_name":"Alex"}}`.
   Share each code privately with its intended member. A code is consumed on
@@ -49,7 +49,8 @@ model for task extraction. Text and voice use the same approval flow.
 
 Discord currently supports the registered `/tasks`, `/done`, and `/link`
 commands. Configure `DISCORD_PUBLIC_KEY`, `DISCORD_APPLICATION_ID`, and
-`DISCORD_BOT_TOKEN`, then run:
+`DISCORD_BOT_TOKEN`, plus `DISCORD_TASK_CHANNEL_ID` for approved task
+assignments, then run:
 
 ```bash
 python3 scripts/register_discord_commands.py
@@ -58,7 +59,12 @@ python3 scripts/register_discord_commands.py
 Set the application's interactions endpoint to
 `https://YOUR-SERVICE/discord/interactions`. Discord task creation and
 natural-language/voice queries are not enabled in this version; use Telegram
-for those workflows.
+for those workflows. The bot needs permission to view and send messages in the
+configured task channel. Each assignee must have a linked Discord account
+(through a one-time `/link` code) or a `discord_user_id` in `TEAM_ROSTER`.
+When an administrator approves a Telegram task, the bot posts its title,
+details, deadline, and requester in that channel and mentions the assignee.
+Failed Discord deliveries remain pending and are retried by `/internal/tick`.
 
 ## Database and reminders
 

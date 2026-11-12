@@ -84,11 +84,16 @@ def apply_migrations() -> None:
             connection.execute(
                 "insert or ignore into schema_migrations(version) values (1)"
             )
-            migration = connection.execute(
-                "select 1 from schema_migrations where version = ?", (2,)
-            ).fetchone()
-            if migration is None:
-                migration_sql = (MIGRATIONS_DIR / "0002_task_approval.sql").read_text()
+            for version, migration_name in (
+                (2, "0002_task_approval.sql"),
+                (3, "0003_discord_task_notifications.sql"),
+            ):
+                migration = connection.execute(
+                    "select 1 from schema_migrations where version = ?", (version,)
+                ).fetchone()
+                if migration is not None:
+                    continue
+                migration_sql = (MIGRATIONS_DIR / migration_name).read_text()
                 migration_sql = migration_sql.replace(
                     "default now()",
                     "default (strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
@@ -97,7 +102,7 @@ def apply_migrations() -> None:
                     if statement.strip():
                         connection.execute(statement)
                 connection.execute(
-                    "insert into schema_migrations(version) values (?)", (2,)
+                    "insert into schema_migrations(version) values (?)", (version,)
                 )
             connection.commit()
             return
@@ -106,7 +111,7 @@ def apply_migrations() -> None:
         connection.execute(
             "create table if not exists schema_migrations(version integer primary key)"
         )
-        for version in (1, 2):
+        for version in (1, 2, 3):
             exists = connection.execute(
                 "select 1 from schema_migrations where version = %s", (version,)
             ).fetchone()
@@ -115,6 +120,8 @@ def apply_migrations() -> None:
             migration_path = MIGRATIONS_DIR / f"{version:04d}_init.sql"
             if version == 2:
                 migration_path = MIGRATIONS_DIR / "0002_task_approval.sql"
+            elif version == 3:
+                migration_path = MIGRATIONS_DIR / "0003_discord_task_notifications.sql"
             for statement in migration_path.read_text().split(";"):
                 if statement.strip():
                     connection.execute(statement)

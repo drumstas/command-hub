@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sqlite3
+from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,6 +11,8 @@ from nacl.signing import SigningKey
 
 from app import command_hub as hub
 from app import database, tasks
+from app.services import discord as discord_service
+from app.services import telegram
 
 
 @pytest.fixture
@@ -20,8 +23,15 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setenv("INTERNAL_SECRET", "internal-secret")
     monkeypatch.setenv("OWNER_TELEGRAM_CHAT_ID", "900")
     monkeypatch.setenv("OWNER_TELEGRAM_USER_ID", "900")
+    monkeypatch.setenv("DISCORD_BOT_TOKEN", "discord-bot-token")
+    monkeypatch.setenv("DISCORD_TASK_CHANNEL_ID", "700")
     monkeypatch.setenv("TEAM_ROSTER", json.dumps([
-        {"key": "alex", "display_name": "Alex", "telegram_chat_id": 200},
+        {
+            "key": "alex",
+            "display_name": "Alex",
+            "telegram_chat_id": 200,
+            "discord_user_id": "alex-discord",
+        },
         {"key": "jonas", "display_name": "Jonas", "telegram_chat_id": 1001},
         {"key": "marta", "display_name": "Marta"},
     ]))
@@ -46,6 +56,10 @@ def test_health_and_task_only_idempotent_migrations(client):
     }
     assert "tasks" in tables
     assert "pending_tasks" in tables
+    columns = {
+        row["name"] for row in hub.fetchall("pragma table_info(tasks)")
+    }
+    assert "discord_notified_at" in columns
     assert "documents" not in tables
     assert "llm_calls" not in tables
 
@@ -55,6 +69,7 @@ def test_existing_non_task_tables_are_not_dropped(tmp_path, monkeypatch):
     connection = sqlite3.connect(database)
     connection.execute("create table schema_migrations(version integer primary key)")
     connection.execute("insert into schema_migrations(version) values (1), (2)")
+    connection.execute("create table tasks(id integer primary key)")
     connection.execute("create table documents(id integer primary key, body text)")
     connection.execute("create table llm_calls(id integer primary key)")
     connection.commit()
@@ -72,6 +87,9 @@ def test_existing_non_task_tables_are_not_dropped(tmp_path, monkeypatch):
     }
     assert "documents" in remaining
     assert "llm_calls" in remaining
+    assert "discord_notified_at" in {
+        row[1] for row in connection.execute("pragma table_info(tasks)")
+    }
     connection.close()
 
 
@@ -97,9 +115,9 @@ def test_task_is_only_persisted_after_admin_approval(client, monkeypatch):
     async def capture_send(chat_id, text, reply_markup=None):
         sent.append((str(chat_id), text, reply_markup))
 
-    monkeypatch.setattr(hub, "send_telegram_message", capture_send)
+    monkeypatch.setattr(telegram, "send_message", capture_send)
     monkeypatch.setattr(
-        hub,
+        telegram,
         "classify_message",
         lambda text, audio=None, audio_mime_type="audio/ogg": tasks.TaskIntent(
             action="create_task",
@@ -117,7 +135,7 @@ def test_task_is_only_persisted_after_admin_approval(client, monkeypatch):
             "text": "Sukurk užduotį Alexui: parengti pasiūlymą iki 2030-12-31",
         },
     }
-    result = asyncio.run(hub.handle_telegram_message(update))
+    result = asyncio.run(telegram.handle_message(update))
     assert result["status"] == "pending_approval"
     assert hub.fetchall("select * from tasks") == []
     pending = hub.fetchall("select * from pending_tasks")
@@ -136,29 +154,83 @@ def test_task_is_only_persisted_after_admin_approval(client, monkeypatch):
         },
     }
     callback_api_calls = []
+    discord_notifications = []
 
     async def capture_api(method, data):
         callback_api_calls.append((method, data))
         return {"ok": True}
 
-    monkeypatch.setattr(hub, "telegram_api", capture_api)
-    approved = asyncio.run(hub.handle_telegram_callback(callback))
+    async def capture_discord(task):
+        discord_notifications.append(task)
+
+    monkeypatch.setattr(telegram, "api", capture_api)
+    monkeypatch.setattr(telegram, "send_task_assignment", capture_discord)
+    approved = asyncio.run(telegram.handle_callback(callback))
     assert approved["status"] == "approve"
     created_tasks = hub.fetchall("select * from tasks")
     assert len(created_tasks) == 1
     assert created_tasks[0]["status"] == "open"
     assert hub.fetchall("select * from pending_tasks") == []
-    assert any(destination == "200" for destination, *_ in sent)
+    assert sent[-1][0] == "1001"
+    assert discord_notifications[0]["assignee_discord_user_id"] == "alex-discord"
+    assert discord_notifications[0]["title"] == "Parengti pasiūlymą"
+    assert created_tasks[0]["discord_notified_at"] is not None
     assert callback_api_calls[0][0] == "answerCallbackQuery"
+
+
+def test_discord_task_assignment_mentions_only_assignee(monkeypatch):
+    monkeypatch.setenv("DISCORD_BOT_TOKEN", "discord-bot-token")
+    monkeypatch.setenv("DISCORD_TASK_CHANNEL_ID", "channel-123")
+    requests = []
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+    class Client:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *_):
+            return None
+
+        async def post(self, url, headers, json):
+            requests.append((url, headers, json))
+            return Response()
+
+    monkeypatch.setattr(discord_service.httpx, "AsyncClient", lambda timeout: Client())
+    asyncio.run(
+        discord_service.send_task_assignment(
+            {
+                "id": 42,
+                "title": "Paruošti ataskaitą",
+                "details": "Įtraukti Q4 rezultatus",
+                "due_at": "2030-12-31T15:00:00+02:00",
+                "assignee_discord_user_id": "alex-discord",
+                "requester_name": "Administrator",
+            }
+        )
+    )
+
+    assert len(requests) == 1
+    url, headers, payload = requests[0]
+    assert url.endswith("/channels/channel-123/messages")
+    assert headers["Authorization"] == "Bot discord-bot-token"
+    assert "<@alex-discord>" in payload["content"]
+    assert "Įtraukti Q4 rezultatus" in payload["content"]
+    assert payload["allowed_mentions"] == {
+        "parse": [],
+        "users": ["alex-discord"],
+    }
 
 
 def test_only_configured_admin_can_approve(client):
     intent = tasks.TaskIntent(
         action="create_task", title="Test", assignee_key="alex", due_at=None
     )
-    token = hub.create_pending_task("evt", 2, intent)
+    token = tasks.create_pending_task("evt", 2, intent)
     with pytest.raises(PermissionError):
-        hub.approve_pending_task(token, 123)
+        tasks.approve_pending_task(token, 123)
     assert hub.fetchall("select * from tasks") == []
 
 
@@ -189,14 +261,14 @@ def test_gemini_returns_validated_task_query_intents(client, monkeypatch):
         models = FakeModels()
 
     monkeypatch.setattr(tasks.genai, "Client", lambda api_key: FakeClient())
-    intent = hub.classify_message(
+    intent = tasks.classify_message(
         "Kurios Alex užduotys iki metų pabaigos?",
         audio=b"voice-bytes",
         audio_mime_type="audio/ogg",
     )
     assert intent.action == "query_tasks"
     assert intent.assignee_key == "alex"
-    assert hub.parse_iso_datetime(intent.due_before) is not None
+    assert tasks.parse_iso_datetime(intent.due_before) is not None
     assert calls[0]["contents"][1].inline_data.data == b"voice-bytes"
 
 
@@ -211,9 +283,9 @@ def test_voice_input_and_natural_language_task_queries(client, monkeypatch):
     async def capture_send(chat_id, text, reply_markup=None):
         sent.append((str(chat_id), text))
 
-    monkeypatch.setattr(hub, "send_telegram_message", capture_send)
+    monkeypatch.setattr(telegram, "send_message", capture_send)
     monkeypatch.setattr(
-        hub,
+        telegram,
         "fetch_message_text",
         lambda message: asyncio.sleep(0, result=("", b"voice-bytes", "audio/ogg")),
     )
@@ -228,10 +300,10 @@ def test_voice_input_and_natural_language_task_queries(client, monkeypatch):
             status="open",
         )
 
-    monkeypatch.setattr(hub, "classify_message", fake_classify)
+    monkeypatch.setattr(telegram, "classify_message", fake_classify)
     questions = []
     monkeypatch.setattr(
-        hub,
+        telegram,
         "summarize_tasks",
         lambda question, tasks: (
             questions.append(question) or f"Alex turi {len(tasks)} atvirą užduotį."
@@ -245,7 +317,7 @@ def test_voice_input_and_natural_language_task_queries(client, monkeypatch):
             "voice": {"file_id": "file"},
         },
     }
-    result = asyncio.run(hub.handle_telegram_message(update))
+    result = asyncio.run(telegram.handle_message(update))
     assert result["status"] == "query"
     assert seen["audio"] == b"voice-bytes"
     assert questions == ["Ką Alexas dabar turi padaryti?"]
@@ -257,8 +329,8 @@ def test_reminders_are_idempotent_for_due_and_overdue_tasks(client, monkeypatch)
     monkeypatch.setattr(hub, "now_local", lambda: fixed_now)
     alex = database.get_member_by_key("alex")
     for title, due in (
-        ("Artėja terminas", fixed_now + hub.timedelta(hours=2)),
-        ("Pradelsta užduotis", fixed_now - hub.timedelta(hours=2)),
+        ("Artėja terminas", fixed_now + timedelta(hours=2)),
+        ("Pradelsta užduotis", fixed_now - timedelta(hours=2)),
     ):
         hub.execute(
             "insert into tasks(title, assignee_id, created_by, due_at) values (?, ?, ?, ?)",
@@ -269,11 +341,17 @@ def test_reminders_are_idempotent_for_due_and_overdue_tasks(client, monkeypatch)
     async def capture_send(chat_id, text, reply_markup=None):
         sent.append(text)
 
-    monkeypatch.setattr(hub, "send_telegram_message", capture_send)
+    async def capture_discord(task):
+        return None
+
+    monkeypatch.setattr(telegram, "send_message", capture_send)
+    monkeypatch.setattr(hub, "send_task_assignment", capture_discord)
     first = asyncio.run(hub.internal_tick("internal-secret"))
     second = asyncio.run(hub.internal_tick("internal-secret"))
     assert first["sent"] == 2
+    assert first["discord_sent"] == 2
     assert second["sent"] == 0
+    assert second["discord_sent"] == 0
     assert any("Vėluoja" in message for message in sent)
 
 
@@ -283,13 +361,13 @@ def test_duplicate_telegram_updates_are_ignored(client, monkeypatch):
     async def capture_send(chat_id, text, reply_markup=None):
         sent.append(text)
 
-    monkeypatch.setattr(hub, "send_telegram_message", capture_send)
+    monkeypatch.setattr(telegram, "send_message", capture_send)
     update = {
         "update_id": 30,
         "message": {"chat": {"id": 555}, "from": {"id": 555}, "text": "hello"},
     }
-    first = asyncio.run(hub.handle_telegram_message(update))
-    second = asyncio.run(hub.handle_telegram_message(update))
+    first = asyncio.run(telegram.handle_message(update))
+    second = asyncio.run(telegram.handle_message(update))
     assert first["status"] == "error"
     assert second["status"] == "duplicate"
     assert len(sent) == 1

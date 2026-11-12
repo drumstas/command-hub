@@ -183,6 +183,7 @@ def create_pending_task(
 def pending_task(token: str) -> dict[str, Any] | None:
     return fetchone(
         """select p.*, m.display_name as assignee_name, m.key as assignee_key,
+                  m.discord_user_id as assignee_discord_user_id,
                   r.display_name as requester_name
            from pending_tasks p
            join members m on m.id = p.assignee_id
@@ -235,8 +236,13 @@ def approve_pending_task(token: str, owner_user_id: int) -> dict[str, Any]:
         connection.close()
     task = fetchone(
         """select t.*, m.key as assignee_key, m.display_name as assignee_name,
-                  m.telegram_chat_id as assignee_chat_id
-           from tasks t join members m on m.id = t.assignee_id where t.id = ?""",
+                  m.telegram_chat_id as assignee_chat_id,
+                  m.discord_user_id as assignee_discord_user_id,
+                  r.display_name as requester_name
+           from tasks t
+           join members m on m.id = t.assignee_id
+           join members r on r.id = t.created_by
+           where t.id = ?""",
         (task_id,),
     )
     if task is None:
