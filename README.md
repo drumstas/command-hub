@@ -33,8 +33,9 @@ python3 -m uvicorn app.command_hub:app --reload
 ```
 
 Configure the Gemini model, Telegram bot, administrator, and roster before
-using the bot. The administrator assigns member IDs through Telegram `/link`;
-members cannot link themselves. See [docs/BOOTSTRAP.md](docs/BOOTSTRAP.md).
+using the bot. The administrator gathers teammate account IDs and assigns them
+through Telegram `/link`; members cannot link themselves. See
+[docs/BOOTSTRAP.md](docs/BOOTSTRAP.md).
 
 ## Important
 

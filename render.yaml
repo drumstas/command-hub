@@ -23,8 +23,6 @@ services:
         value: Administrator
       - key: TEAM_ROSTER
         sync: false
-      - key: LINK_CODES
-        sync: false
       - key: DISCORD_PUBLIC_KEY
         sync: false
       - key: DISCORD_BOT_TOKEN

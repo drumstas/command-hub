@@ -43,9 +43,9 @@ This application manages team tasks only.
 
 ## Database
 
-The schema contains team members and their platform IDs, tasks, pending task
-proposals, processed webhook event IDs, and task audit records. Migrations
-apply idempotently at startup.
+The schema contains team members and their administrator-assigned platform IDs,
+tasks, pending task proposals, processed webhook event IDs, and task audit
+records. Migrations apply idempotently at startup.
 
 ## User workflows
 

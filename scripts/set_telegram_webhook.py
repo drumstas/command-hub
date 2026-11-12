@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from urllib import parse, request
+
+from dotenv import load_dotenv
+
+APP_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(APP_ROOT / ".env")
 
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 WEBHOOK_URL = os.getenv("APP_PUBLIC_URL", "")

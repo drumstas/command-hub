@@ -37,7 +37,8 @@ real Telegram IDs in this repository.
 2. Set the administrator chat and user IDs. Include the administrator in
    `TEAM_ROSTER` with `key: "owner"` so Gemini can assign tasks to them too.
 3. Configure the roster, including the administrator under `key: "owner"`.
-4. Deploy the service and set `APP_PUBLIC_URL` to its HTTPS URL.
+4. Deploy the service. In the local `.env` used to run setup scripts, set
+   `APP_PUBLIC_URL` to its HTTPS URL.
 5. Run `python3 scripts/set_telegram_webhook.py`. It registers
    `/telegram/webhook`, the configured secret token, and the message/callback
    update types.
@@ -82,7 +83,8 @@ endpoint sends Telegram due-soon and overdue reminders. `/healthz` is a
 separate lightweight health check and does not run reminders.
 
 For a Render deployment, use `render.yaml` and add all secret values in the
-Render dashboard. GitHub Actions scheduled jobs are best-effort; configure an
+Render dashboard. Render uses the repository's `.python-version` file to select
+Python 3.14. GitHub Actions scheduled jobs are best-effort; configure an
 independent scheduler as a fallback if reminder timing matters.
 
 The GitHub Actions keepalive workflow is currently manual-only. After deploying

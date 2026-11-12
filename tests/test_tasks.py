@@ -151,6 +151,20 @@ def test_admin_account_assignment_validates_roster_and_unique_ids(client):
         database.assign_member_account("discord", "3000", "marta")
 
 
+def test_member_lookup_binds_postgres_id_types_by_platform(monkeypatch):
+    calls = []
+
+    def capture_fetchone(sql, params):
+        calls.append((sql, params))
+
+    monkeypatch.setattr(database, "fetchone", capture_fetchone)
+    database.member_from_chat("telegram", "123")
+    database.member_from_chat("discord", 456)
+
+    assert calls[0][1] == (123,)
+    assert calls[1][1] == ("456",)
+
+
 def test_task_is_only_persisted_after_admin_approval(client, monkeypatch):
     sent = []
 

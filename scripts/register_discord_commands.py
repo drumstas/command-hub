@@ -8,7 +8,13 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from urllib import error, request
+
+from dotenv import load_dotenv
+
+APP_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(APP_ROOT / ".env")
 
 APP_ID = os.getenv("DISCORD_APPLICATION_ID", "")
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")

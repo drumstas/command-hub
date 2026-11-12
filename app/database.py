@@ -107,7 +107,7 @@ def apply_migrations() -> None:
             connection.commit()
             return
 
-        connection.execute("select pg_advisory_lock(431721091)")
+        connection.execute("select pg_advisory_xact_lock(431721091)")
         connection.execute(
             "create table if not exists schema_migrations(version integer primary key)"
         )
@@ -129,7 +129,6 @@ def apply_migrations() -> None:
                 "insert into schema_migrations(version) values (%s)", (version,)
             )
         connection.commit()
-        connection.execute("select pg_advisory_unlock(431721091)")
     finally:
         connection.close()
 
@@ -238,7 +237,10 @@ def get_member_by_id(member_id: int) -> dict[str, Any] | None:
 
 def member_from_chat(platform: str, chat_id: int | str) -> dict[str, Any] | None:
     column = "telegram_chat_id" if platform == "telegram" else "discord_user_id"
-    return fetchone(f"select * from members where {column} = ?", (str(chat_id),))
+    account_id: int | str = (
+        int(chat_id) if platform == "telegram" else str(chat_id)
+    )
+    return fetchone(f"select * from members where {column} = ?", (account_id,))
 
 
 def assign_member_account(

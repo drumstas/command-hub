@@ -5,8 +5,9 @@ komandos nariai patys savo paskyrų susieti negali.
 
 ## Administratoriaus komandos
 
-Surinkęs nario paskyros ID, administratorius jį priskiria esamam `TEAM_ROSTER`
-nariui Telegram pokalbyje su botu:
+Surinkęs nario paskyros ID (pavyzdžiui, per Discord Developer Mode arba
+Telegram ID informacijos botą), administratorius jį priskiria esamam
+`TEAM_ROSTER` nariui savo Telegram pokalbyje su botu:
 
 ```text
 /link <roster_key> <telegram|discord> <numeric_user_id>
