@@ -85,6 +85,11 @@ For a Render deployment, use `render.yaml` and add all secret values in the
 Render dashboard. GitHub Actions scheduled jobs are best-effort; configure an
 independent scheduler as a fallback if reminder timing matters.
 
+The GitHub Actions keepalive workflow is currently manual-only. After deploying
+the app, add the repository secret `HEALTHCHECK_URL` with the deployed
+`https://YOUR-SERVICE/healthz` URL, then restore the `schedule` trigger in
+`.github/workflows/keepalive.yml` to enable periodic pings.
+
 ## Local checks
 
 ```bash
