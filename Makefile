@@ -1,0 +1,21 @@
+PYTHON ?= python
+PYTEST ?= $(PYTHON) -m pytest
+
+.PHONY: bootstrap deploy-check smoke test
+
+bootstrap:
+	@echo "1. Copy .env.example to .env and fill secrets."
+	@echo "2. Run: python -m pip install -r requirements.txt"
+	@echo "3. Run: python scripts/register_discord_commands.py"
+	@echo "4. Run: python scripts/set_telegram_webhook.py"
+	@echo "5. Review docs/BOOTSTRAP.md"
+
+deploy-check:
+	@$(PYTHON) -m compileall app
+	@$(PYTHON) -m pytest -q
+
+smoke:
+	@curl -fsS http://localhost:8000/healthz
+
+test:
+	@$(PYTEST) -q

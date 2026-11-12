@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: command-hub
+    runtime: python
+    plan: free
+    region: frankfurt
+    branch: main
+    healthCheckPath: /healthz
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn app.command_hub:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: TELEGRAM_SECRET
+        sync: false
+      - key: DISCORD_PUBLIC_KEY
+        sync: false
+      - key: INTERNAL_SECRET
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        sync: false
+      - key: OWNER_CODE
+        sync: false
