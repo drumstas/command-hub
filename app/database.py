@@ -241,66 +241,45 @@ def member_from_chat(platform: str, chat_id: int | str) -> dict[str, Any] | None
     return fetchone(f"select * from members where {column} = ?", (str(chat_id),))
 
 
-def link_member(
-    platform: str, account_id: int | str, code: str, display_name: str
-) -> dict[str, Any] | None:
-    link_codes = json.loads(os.getenv("LINK_CODES", "{}"))
-    configured = link_codes.get(code)
-    if not isinstance(configured, dict):
-        return None
-    key = configured.get("key")
-    if not key:
-        return None
+def assign_member_account(
+    platform: str, account_id: str, member_key: str
+) -> dict[str, Any]:
+    if platform not in ("telegram", "discord"):
+        raise ValueError("Platform must be telegram or discord.")
+    if not account_id.isdigit() or int(account_id) <= 0:
+        raise ValueError("Account ID must be a positive numeric ID.")
     column = "telegram_chat_id" if platform == "telegram" else "discord_user_id"
+    stored_id: int | str = int(account_id) if platform == "telegram" else account_id
     connection = get_connection()
     try:
         if is_sqlite():
             connection.execute("begin immediate")
         else:
             connection.execute("select pg_advisory_xact_lock(431721093)")
-        used = connection.execute(
-            sql_for_connection("select 1 from used_link_codes where code = ?"),
-            (code,),
-        ).fetchone()
-        if used is not None:
-            connection.rollback()
-            return None
         member = connection.execute(
-            sql_for_connection("select * from members where key = ?"), (key,)
+            sql_for_connection("select * from members where key = ?"), (member_key,)
         ).fetchone()
-        if member is not None and member[column] is not None:
-            connection.rollback()
-            return None
         if member is None:
-            connection.execute(
-                sql_for_connection(
-                    """insert into members(key, display_name, role, telegram_chat_id,
-                                           discord_user_id, preferred_channel)
-                       values (?, ?, 'member', ?, ?, ?)"""
-                ),
-                (
-                    key,
-                    configured.get("display_name", display_name),
-                    account_id if platform == "telegram" else None,
-                    str(account_id) if platform == "discord" else None,
-                    platform,
-                ),
-            )
-        else:
-            connection.execute(
-                sql_for_connection(f"update members set {column} = ? where key = ?"),
-                (account_id, key),
-            )
+            raise ValueError(f"Roster member '{member_key}' was not found.")
         connection.execute(
-            sql_for_connection(
-                "insert into used_link_codes(code, member_key, platform) values (?, ?, ?)"
-            ),
-            (code, key, platform),
+            sql_for_connection(f"update members set {column} = ? where key = ?"),
+            (stored_id, member_key),
         )
         connection.commit()
+    except (sqlite3.IntegrityError, psycopg.errors.UniqueViolation) as error:
+        connection.rollback()
+        raise ValueError(
+            f"This {platform} account ID is already assigned to another roster member."
+        ) from error
+    except Exception:
+        connection.rollback()
+        raise
     finally:
         connection.close()
-    return member_from_chat(platform, account_id)
+    member = get_member_by_key(member_key)
+    if member is None:
+        raise RuntimeError("Roster member disappeared after account assignment.")
+    return member
 
 
 def record_event(source: str, event_id: str) -> bool:

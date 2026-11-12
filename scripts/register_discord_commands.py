@@ -20,7 +20,6 @@ COMMANDS = [
         "options": [{"name": "scope", "description": "Task scope", "type": 3, "choices": [{"name": "mine", "value": "mine"}, {"name": "all", "value": "all"}]}],
     },
     {"name": "done", "description": "Mark a task as done.", "options": [{"name": "task_id", "description": "Task id", "type": 4, "required": True}]},
-    {"name": "link", "description": "Link your chat to your roster handle.", "options": [{"name": "code", "description": "Your shared code", "type": 3, "required": True}]},
 ]
 
 if not APP_ID or not BOT_TOKEN:

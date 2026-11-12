@@ -20,7 +20,6 @@ from .database import (
     fetchall,
     is_duplicate_event,
     is_sqlite,
-    link_member,
     member_from_chat,
     record_event,
 )
@@ -128,15 +127,9 @@ async def discord_interactions(request: Request) -> JSONResponse:
         return JSONResponse(content={"type": 4, "data": {"content": "Ši komanda jau apdorota.", "flags": 64}})
     member = member_from_chat("discord", discord_id or "")
     if command == "link":
-        linked = link_member(
-            "discord",
-            str(discord_id or ""),
-            str(options.get("code", "")),
-            user.get("username", "Discord naudotojas"),
-        )
-        content = "Paskyra susieta." if linked else "Neteisingas arba nebegaliojantis susiejimo kodas."
+        content = "Paskyras susieja tik administratorius Telegram komanda /link."
     elif member is None:
-        content = "Paskyra nesusieta. Susiekite ją komanda /link."
+        content = "Paskyra nesusieta. Paprašykite administratoriaus ją susieti."
     elif command == "tasks":
         scope = "mine" if options.get("scope") == "mine" else "all"
         tasks = list_tasks(member["id"], scope)

@@ -36,13 +36,6 @@ def client(tmp_path, monkeypatch):
         {"key": "jonas", "display_name": "Jonas", "telegram_chat_id": 1001},
         {"key": "marta", "display_name": "Marta"},
     ]))
-    monkeypatch.setenv("LINK_CODES", json.dumps({
-        "owner-discord-code": {"key": "owner", "display_name": "Administrator"},
-        "alex-code": {"key": "alex", "display_name": "Alex"},
-        "jonas-code": {"key": "jonas", "display_name": "Jonas"},
-        "marta-code": {"key": "marta", "display_name": "Marta"},
-        "marta-discord-code": {"key": "marta", "display_name": "Marta"},
-    }))
     with TestClient(hub.app) as test_client:
         yield test_client
 
@@ -73,11 +66,9 @@ def test_admin_is_seeded_as_a_task_roster_member(client):
     assert owner["role"] == "owner"
     assert owner["telegram_chat_id"] == 900
     assert owner["key"] in database.roster()
-    linked_owner = hub.link_member(
-        "discord", "owner-discord", "owner-discord-code", "Administrator"
-    )
+    linked_owner = database.assign_member_account("discord", "9000", "owner")
     assert linked_owner["role"] == "owner"
-    assert linked_owner["discord_user_id"] == "owner-discord"
+    assert linked_owner["discord_user_id"] == "9000"
 
 
 def test_existing_non_task_tables_are_not_dropped(tmp_path, monkeypatch):
@@ -109,20 +100,55 @@ def test_existing_non_task_tables_are_not_dropped(tmp_path, monkeypatch):
     connection.close()
 
 
-def test_link_code_cannot_be_used_to_take_over_member(client):
-    linked = hub.link_member("telegram", 300, "alex-code", "Alex")
-    assert linked is None
-    original = database.get_member_by_key("alex")
-    assert original["telegram_chat_id"] == 200
+def test_admin_assigns_member_ids_from_telegram_and_members_cannot(client, monkeypatch):
+    sent = []
 
-    code = hub.link_member("telegram", 301, "marta-code", "Marta")
-    assert code["key"] == "marta"
-    assert hub.link_member("telegram", 302, "marta-code", "Marta") is None
-    discord_link = hub.link_member(
-        "discord", "marta-discord", "marta-discord-code", "Marta"
-    )
-    assert discord_link["telegram_chat_id"] == 301
-    assert discord_link["discord_user_id"] == "marta-discord"
+    async def capture_send(chat_id, text, reply_markup=None):
+        sent.append((str(chat_id), text))
+
+    monkeypatch.setattr(telegram, "send_message", capture_send)
+    update = {
+        "update_id": 8,
+        "message": {
+            "chat": {"id": 900},
+            "from": {"id": 900},
+            "text": "/link alex discord 3000",
+        },
+    }
+
+    result = asyncio.run(telegram.handle_message(update))
+
+    assert result["status"] == "linked"
+    assert database.get_member_by_key("alex")["discord_user_id"] == "3000"
+
+    update["update_id"] = 10
+    update["message"]["text"] = "/link marta telegram 301"
+    result = asyncio.run(telegram.handle_message(update))
+    assert result["status"] == "linked"
+    assert database.get_member_by_key("marta")["telegram_chat_id"] == 301
+
+    unauthorized = {
+        "update_id": 11,
+        "message": {
+            "chat": {"id": 1001},
+            "from": {"id": 1001},
+            "text": "/link marta telegram 301",
+        },
+    }
+    result = asyncio.run(telegram.handle_message(unauthorized))
+    assert result["status"] == "unauthorized"
+    assert database.get_member_by_key("marta")["telegram_chat_id"] == 301
+    assert "Tik administratorius" in sent[-1][1]
+
+
+def test_admin_account_assignment_validates_roster_and_unique_ids(client):
+    with pytest.raises(ValueError, match="was not found"):
+        database.assign_member_account("discord", "123", "unknown")
+    with pytest.raises(ValueError, match="numeric ID"):
+        database.assign_member_account("discord", "alex-id", "alex")
+    with pytest.raises(ValueError, match="already assigned"):
+        database.assign_member_account("discord", "3000", "alex")
+        database.assign_member_account("discord", "3000", "marta")
 
 
 def test_task_is_only_persisted_after_admin_approval(client, monkeypatch):
@@ -422,3 +448,24 @@ def test_discord_ping_and_signature_check(client, monkeypatch):
         headers={"X-Signature-Ed25519": "00", "X-Signature-Timestamp": timestamp},
     )
     assert bad.status_code == 401
+
+    link_payload = {
+        "type": 2,
+        "id": "discord-link-attempt",
+        "user": {"id": "777"},
+        "data": {"name": "link", "options": [{"name": "code", "value": "anything"}]},
+    }
+    link_body = json.dumps(link_payload).encode()
+    link_signature = signing_key.sign(
+        timestamp.encode() + b"." + link_body
+    ).signature.hex()
+    response = client.post(
+        "/discord/interactions",
+        content=link_body,
+        headers={
+            "X-Signature-Ed25519": link_signature,
+            "X-Signature-Timestamp": timestamp,
+        },
+    )
+    assert "tik administratorius" in response.json()["data"]["content"].casefold()
+    assert database.get_member_by_key("marta")["discord_user_id"] is None

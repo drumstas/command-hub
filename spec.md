@@ -15,8 +15,8 @@ This application manages team tasks only.
   produce validated filters, query the database in application code, and
   summarize only the matching results.
 - List tasks, mark tasks done, and send due-soon and overdue reminders.
-- Support Telegram for task creation/approval and Discord for task
-  notifications, account linking, listing tasks, and marking tasks done.
+- Support Telegram for task creation/approval and administrator-managed account
+  assignments, plus Discord task notifications, listing, and completion.
 
 ## Safety and authorization
 
@@ -43,13 +43,14 @@ This application manages team tasks only.
 
 ## Database
 
-The schema contains team members, tasks, pending task proposals, consumed
-one-time linking codes, processed webhook event IDs, and task audit records.
-Migrations apply idempotently at startup.
+The schema contains team members and their platform IDs, tasks, pending task
+proposals, processed webhook event IDs, and task audit records. Migrations
+apply idempotently at startup.
 
 ## User workflows
 
-1. Members link their chat account with a one-time code.
+1. The administrator assigns gathered platform IDs to roster members using
+   Telegram `/link <roster_key> <telegram|discord> <user_id>`.
 2. A member submits a task in Telegram using text or voice.
 3. Gemini proposes task fields; the administrator reviews and approves or
    rejects the proposal.

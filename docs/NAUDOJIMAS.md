@@ -1,20 +1,27 @@
 # Command Hub naudojimas
 
-Ši versija skirta tik užduotims. Pagrindinis darbo būdas — Telegram; Discord
-šiuo metu palaiko tik užduočių sąrašo peržiūrą, atlikimo žymėjimą ir paskyros
-susiejimą.
+Ši versija skirta tik užduotims. Administratorius valdo paskyrų susiejimą;
+komandos nariai patys savo paskyrų susieti negali.
 
-## Telegram paskyros susiejimas
+## Administratoriaus komandos
 
-Pradėkite asmeninį pokalbį su botu ir parašykite jums skirtą kodą:
+Surinkęs nario paskyros ID, administratorius jį priskiria esamam `TEAM_ROSTER`
+nariui Telegram pokalbyje su botu:
 
 ```text
-/link JUMS_SKIRTAS_KODAS
+/link <roster_key> <telegram|discord> <numeric_user_id>
 ```
 
-Kodas susieja Telegram paskyrą su komandos nariu ir po susiejimo tampa
-nebegaliojantis. Jei susiejate ir Discord paskyrą, jai reikalingas atskiras
-kodas.
+Pavyzdžiui, susieti Alexo Discord paskyrą:
+
+```text
+/link alex discord 123456789012345678
+```
+
+Nario Telegram paskyrai naudojama `telegram` platforma. Administratoriaus
+Telegram paskyra nustatoma per `OWNER_TELEGRAM_CHAT_ID` ir
+`OWNER_TELEGRAM_USER_ID`; jo Discord paskyrą galima susieti komanda
+`/link owner discord <user_id>`.
 
 ## Pateikti užduotį
 
@@ -30,7 +37,8 @@ nepavyksta nustatyti, patikslinkite užklausą.
 Prieš sukuriant užduotį, administratorius Telegram pokalbyje gaus jos peržiūrą
 ir galės pasirinkti **Patvirtinti** arba **Atmesti**. Užduotis į pagrindinį
 užduočių sąrašą įrašoma tik administratoriui ją patvirtinus. Patvirtinus
-atsakingam asmeniui išsiunčiamas pranešimas.
+užduoties informacija paskelbiama Discord kanale ir pažymimas atsakingas
+asmuo. Atsakingo asmens Discord ID turi būti priskirtas administratoriaus.
 
 ## Klausti apie užduotis
 
@@ -52,9 +60,8 @@ Taip pat galite naudoti komandas:
 
 ## Discord
 
-Discord šiuo metu palaiko `/link`, `/tasks` ir `/done`. Užduočių kūrimas su
-administratoriaus patvirtinimu, balso žinutės ir klausimai natūralia kalba
-prieinami tik per Telegram.
+Discord palaiko `/tasks` ir `/done`. Užduočių kūrimas su administratoriaus
+patvirtinimu, balso žinutės ir klausimai natūralia kalba prieinami per Telegram.
 
 ## Telegram pranešimai
 

@@ -12,12 +12,12 @@ from fastapi import Request
 from fastapi.responses import JSONResponse
 
 from ..database import (
+    assign_member_account,
     execute,
     fetchall,
     get_member_by_id,
     is_duplicate_event,
     is_sqlite,
-    link_member,
     log_action,
     member_from_chat,
     record_event,
@@ -99,30 +99,38 @@ async def handle_message(update: dict[str, Any]) -> dict[str, Any]:
     sender = message.get("from") or {}
     text, audio, _ = await fetch_message_text(message)
 
-    if text.startswith("/link "):
-        member = link_member(
-            "telegram",
-            int(chat_id),
-            text.split(maxsplit=1)[1].strip(),
-            sender.get("first_name", "Telegram naudotojas"),
-        )
-        if member is None:
+    command = text.strip().split()
+    if command and command[0].split("@", 1)[0] == "/link":
+        expected_admin = os.getenv("OWNER_TELEGRAM_USER_ID")
+        if not expected_admin or str(sender.get("id")) != expected_admin:
+            await send_message(chat_id, "Tik administratorius gali susieti paskyras.")
+            record_event("telegram", event_id)
+            return {"status": "unauthorized"}
+        if len(command) != 4:
             await send_message(
-                chat_id, "Neteisingas arba nebegaliojantis susiejimo kodas."
+                chat_id, "Naudojimas: /link <roster_key> <telegram|discord> <user_id>"
             )
             record_event("telegram", event_id)
-            return {"status": "error", "message": "invalid link code"}
+            return {"status": "error", "message": "invalid link command"}
+        _, member_key, platform, account_id = command
+        try:
+            member = assign_member_account(platform, account_id, member_key)
+        except ValueError as error:
+            await send_message(chat_id, str(error))
+            record_event("telegram", event_id)
+            return {"status": "error", "message": str(error)}
         await send_message(
             chat_id,
-            "Paskyra susieta. Dabar galite teikti užduotis ir klausti apie jas.",
+            f"{member['display_name']} susietas su {platform} paskyra {account_id}.",
         )
         record_event("telegram", event_id)
-        return {"status": "linked"}
+        return {"status": "linked", "member_key": member_key, "platform": platform}
 
     member = member_from_chat("telegram", chat_id)
     if member is None:
         await send_message(
-            chat_id, "Paskyra nesusieta. Susiekite ją komanda /link KODAS."
+            chat_id,
+            "Paskyra nesusieta. Paprašykite administratoriaus ją susieti.",
         )
         record_event("telegram", event_id)
         return {"status": "error", "message": "not linked"}
