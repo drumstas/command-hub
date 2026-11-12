@@ -63,9 +63,7 @@ for those workflows.
 ## Database and reminders
 
 The app applies idempotent migrations on startup. Migration `0002` creates
-task-approval storage. Migration `0003` removes old document and LLM-usage
-tables; their data is intentionally discarded because those features are out
-of scope.
+task-approval storage.
 
 Configure a scheduler to call `POST /internal/tick` with the
 `X-Internal-Secret` header set to `INTERNAL_SECRET` every 15 minutes. This

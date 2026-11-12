@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from nacl.signing import SigningKey
 
 from app import command_hub as hub
+from app import database, tasks
 
 
 @pytest.fixture
@@ -49,7 +50,7 @@ def test_health_and_task_only_idempotent_migrations(client):
     assert "llm_calls" not in tables
 
 
-def test_migration_removes_non_task_tables(tmp_path, monkeypatch):
+def test_existing_non_task_tables_are_not_dropped(tmp_path, monkeypatch):
     database = tmp_path / "legacy.sqlite"
     connection = sqlite3.connect(database)
     connection.execute("create table schema_migrations(version integer primary key)")
@@ -69,15 +70,15 @@ def test_migration_removes_non_task_tables(tmp_path, monkeypatch):
             "select name from sqlite_master where type = 'table'"
         )
     }
-    assert "documents" not in remaining
-    assert "llm_calls" not in remaining
+    assert "documents" in remaining
+    assert "llm_calls" in remaining
     connection.close()
 
 
 def test_link_code_cannot_be_used_to_take_over_member(client):
     linked = hub.link_member("telegram", 300, "alex-code", "Alex")
     assert linked is None
-    original = hub.get_member_by_key("alex")
+    original = database.get_member_by_key("alex")
     assert original["telegram_chat_id"] == 200
 
     code = hub.link_member("telegram", 301, "marta-code", "Marta")
@@ -100,7 +101,7 @@ def test_task_is_only_persisted_after_admin_approval(client, monkeypatch):
     monkeypatch.setattr(
         hub,
         "classify_message",
-        lambda text, audio=None, audio_mime_type="audio/ogg": hub.TaskIntent(
+        lambda text, audio=None, audio_mime_type="audio/ogg": tasks.TaskIntent(
             action="create_task",
             title="Parengti pasiūlymą",
             details="Klientui Acme",
@@ -143,16 +144,16 @@ def test_task_is_only_persisted_after_admin_approval(client, monkeypatch):
     monkeypatch.setattr(hub, "telegram_api", capture_api)
     approved = asyncio.run(hub.handle_telegram_callback(callback))
     assert approved["status"] == "approve"
-    tasks = hub.fetchall("select * from tasks")
-    assert len(tasks) == 1
-    assert tasks[0]["status"] == "open"
+    created_tasks = hub.fetchall("select * from tasks")
+    assert len(created_tasks) == 1
+    assert created_tasks[0]["status"] == "open"
     assert hub.fetchall("select * from pending_tasks") == []
     assert any(destination == "200" for destination, *_ in sent)
     assert callback_api_calls[0][0] == "answerCallbackQuery"
 
 
 def test_only_configured_admin_can_approve(client):
-    intent = hub.TaskIntent(
+    intent = tasks.TaskIntent(
         action="create_task", title="Test", assignee_key="alex", due_at=None
     )
     token = hub.create_pending_task("evt", 2, intent)
@@ -187,7 +188,7 @@ def test_gemini_returns_validated_task_query_intents(client, monkeypatch):
     class FakeClient:
         models = FakeModels()
 
-    monkeypatch.setattr(hub.genai, "Client", lambda api_key: FakeClient())
+    monkeypatch.setattr(tasks.genai, "Client", lambda api_key: FakeClient())
     intent = hub.classify_message(
         "Kurios Alex užduotys iki metų pabaigos?",
         audio=b"voice-bytes",
@@ -200,7 +201,7 @@ def test_gemini_returns_validated_task_query_intents(client, monkeypatch):
 
 
 def test_voice_input_and_natural_language_task_queries(client, monkeypatch):
-    alex = hub.get_member_by_key("alex")
+    alex = database.get_member_by_key("alex")
     hub.execute(
         "insert into tasks(title, assignee_id, created_by, due_at) values (?, ?, ?, ?)",
         ("Paruošti ataskaitą", alex["id"], alex["id"], "2030-12-31T15:00:00+02:00"),
@@ -220,7 +221,7 @@ def test_voice_input_and_natural_language_task_queries(client, monkeypatch):
 
     def fake_classify(text, audio=None, audio_mime_type="audio/ogg"):
         seen["audio"] = audio
-        return hub.TaskIntent(
+        return tasks.TaskIntent(
             action="query_tasks",
             query_text="Ką Alexas dabar turi padaryti?",
             assignee_key="alex",
@@ -254,7 +255,7 @@ def test_voice_input_and_natural_language_task_queries(client, monkeypatch):
 def test_reminders_are_idempotent_for_due_and_overdue_tasks(client, monkeypatch):
     fixed_now = hub.now_local().replace(microsecond=0)
     monkeypatch.setattr(hub, "now_local", lambda: fixed_now)
-    alex = hub.get_member_by_key("alex")
+    alex = database.get_member_by_key("alex")
     for title, due in (
         ("Artėja terminas", fixed_now + hub.timedelta(hours=2)),
         ("Pradelsta užduotis", fixed_now - hub.timedelta(hours=2)),

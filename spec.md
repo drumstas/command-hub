@@ -43,8 +43,7 @@ This application manages team tasks only.
 
 The schema contains team members, tasks, pending task proposals, consumed
 one-time linking codes, processed webhook event IDs, and task audit records.
-Migrations apply idempotently at startup. Migration 0003 drops legacy document
-and LLM-usage tables because those features are not part of this application.
+Migrations apply idempotently at startup.
 
 ## User workflows
 
